@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 
-const EXCEL_URL = "/mnt/data/Urm survey questions.xlsx"; 
+const EXCEL_URL = "/survey-questions.xlsx"; 
 // NOTE: your environment will transform this path into an accessible URL.
 // This is the path you uploaded the file to.
 
