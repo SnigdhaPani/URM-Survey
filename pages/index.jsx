@@ -1,7 +1,7 @@
 // pages/index.jsx
 import { useEffect, useRef, useState } from "react";
 
-const QUESTIONS_URL = "/data/questions.json"; // served statically from public/data/questions.json
+const QUESTIONS_URL = "/data/questions.json";
 
 const VIDEO_MAP = {
   CE: {
@@ -58,17 +58,20 @@ function extractYouTubeID(url) {
 }
 
 export default function SurveyPage() {
-  const [stage, setStage] = useState("consent"); // consent -> demographics -> video -> questions -> complete/exit
+  const [stage, setStage] = useState("consent");
   const [consent, setConsent] = useState(null);
 
   // demographics
-  const [ageGroup, setAgeGroup] = useState(null); // only 18-25 or 26-35 choices
+  const [ageGroup, setAgeGroup] = useState(null);
   const [gender, setGender] = useState(null);
 
   // questions data
   const [questionsByType, setQuestionsByType] = useState({});
   const [assignedType, setAssignedType] = useState(null);
   const [assignedAd, setAssignedAd] = useState(null);
+
+  // NEW: Current question index
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
   // youtube player
   const ytRef = useRef(null);
@@ -100,9 +103,8 @@ export default function SurveyPage() {
     load();
   }, []);
 
-  // Consent (no age on consent page)
   function handleConsentContinue() {
-    if (!consent) {
+    if (consent === null) {
       alert("Please choose whether you agree to participate.");
       return;
     }
@@ -113,24 +115,19 @@ export default function SurveyPage() {
     setStage("demographics");
   }
 
-  // Assign random type (only when valid demographics selected)
   function startExperiment() {
     if (!ageGroup || !gender) {
       alert("Please select age group and gender.");
       return;
     }
-    // choose random
     const keys = Object.keys(VIDEO_MAP);
     const chosen = keys[Math.floor(Math.random() * keys.length)];
     setAssignedType(chosen);
     setAssignedAd(VIDEO_MAP[chosen]);
     setStage("video");
-
-    // init YT player shortly after render
     setTimeout(() => initYT(VIDEO_MAP[chosen].yt), 300);
   }
 
-  // init YT iframe API
   async function initYT(url) {
     if (!window.YT) {
       const tag = document.createElement("script");
@@ -146,7 +143,6 @@ export default function SurveyPage() {
       });
     }
 
-    // destroy previous if exists
     try {
       if (ytRef.current && ytRef.current.destroy) {
         ytRef.current.destroy();
@@ -174,7 +170,6 @@ export default function SurveyPage() {
         },
         onStateChange: (e) => {
           if (e.data === 0) {
-            // ended
             const end = new Date().toISOString();
             setEndTime(end);
             let secs = null;
@@ -189,7 +184,6 @@ export default function SurveyPage() {
     });
   }
 
-  // handle more-info click
   function handleMoreInfoClick() {
     setClickedMoreInfo(true);
     if (assignedAd && assignedAd.moreInfo) {
@@ -197,15 +191,38 @@ export default function SurveyPage() {
     }
   }
 
-  // answer handling
   function setAnswer(qIndex, numeric) {
     setAnswers((p) => ({ ...p, [qIndex]: numeric }));
   }
 
-  // submit saved payload to /api/submit
-  async function handleSubmit() {
-    // build responses: flatten questions for assignedType
+  // NEW: Handle next question
+  function handleNextQuestion() {
     const qList = questionsByType[assignedType] || [];
+    if (answers[currentQuestionIndex] === undefined) {
+      alert("Please select an answer before proceeding.");
+      return;
+    }
+    if (currentQuestionIndex < qList.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    }
+  }
+
+  // NEW: Handle previous question
+  function handlePreviousQuestion() {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(currentQuestionIndex - 1);
+    }
+  }
+
+  async function handleSubmit() {
+    const qList = questionsByType[assignedType] || [];
+    
+    // Check if current question is answered
+    if (answers[currentQuestionIndex] === undefined) {
+      alert("Please answer the current question before submitting.");
+      return;
+    }
+
     const responsesObj = {};
     qList.forEach((qText, idx) => {
       const v = answers[idx] ?? null;
@@ -240,11 +257,14 @@ export default function SurveyPage() {
       setStage("complete");
     } catch (err) {
       console.error(err);
-      alert("Failed to submit, please try again.");
+      alert("Failed to submit: " + err.message);
     }
   }
 
-  // render UI
+  const qList = questionsByType[assignedType] || [];
+  const totalQuestions = qList.length;
+  const isLastQuestion = currentQuestionIndex === totalQuestions - 1;
+
   return (
     <div className="page">
       <div className="container">
@@ -253,7 +273,7 @@ export default function SurveyPage() {
           <p className="sub">You will watch one short video and answer questions about it. Estimated time: 10–15 minutes.</p>
         </header>
 
-        <ProgressBar stage={stage} />
+        <ProgressBar stage={stage} currentQ={currentQuestionIndex} totalQ={totalQuestions} />
 
         {stage === "consent" && (
           <div className="card">
@@ -297,7 +317,7 @@ export default function SurveyPage() {
             </div>
 
             <div className="card-actions">
-              <button className="btn primary" onClick={handleConsentContinue} disabled={!consent}>Continue</button>
+              <button className="btn primary" onClick={handleConsentContinue} disabled={consent === null}>Continue</button>
               <button className="btn ghost" onClick={() => { setConsent(false); setStage("exit"); }}>Decline</button>
             </div>
           </div>
@@ -353,33 +373,40 @@ export default function SurveyPage() {
 
         {stage === "questions" && (
           <div className="card">
-            <h2>Questions — {VIDEO_MAP[assignedType].name}</h2>
-            <p className="muted">Rate each statement</p>
+            <h2>Question {currentQuestionIndex + 1} of {totalQuestions}</h2>
+            <p className="muted small">{VIDEO_MAP[assignedType].name}</p>
 
-            <div className="questions-list">
-              {(questionsByType[assignedType] || []).map((qText, idx) => (
-                <div className="question-row" key={idx}>
-                  <div className="q-text">{qText}</div>
-                  <div className="q-choices">
-                    {LIKERT.map((label, li) => (
-                      <label key={li} className="choice">
-                        <input type="radio" name={`q-${idx}`} checked={answers[idx] === li + 1} onChange={() => setAnswer(idx, li + 1)} />
-                        <span>{label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              ))}
+            <div className="single-question">
+              <div className="q-text-large">{qList[currentQuestionIndex]}</div>
+              <div className="q-choices-vertical">
+                {LIKERT.map((label, li) => (
+                  <label key={li} className="choice-large">
+                    <input 
+                      type="radio" 
+                      name={`q-${currentQuestionIndex}`} 
+                      checked={answers[currentQuestionIndex] === li + 1} 
+                      onChange={() => setAnswer(currentQuestionIndex, li + 1)} 
+                    />
+                    <span>{label}</span>
+                  </label>
+                ))}
+              </div>
             </div>
 
-            {/* More info button shown under all questions (Option 2) */}
-            <div style={{ marginTop: 12 }}>
+            <div style={{ marginTop: 20, marginBottom: 12 }}>
               <button className="btn link" onClick={handleMoreInfoClick}>More information about the product</button>
               {assignedAd && <a className="more-link" href={assignedAd.moreInfo} target="_blank" rel="noreferrer" style={{ marginLeft: 12 }}>{assignedAd.moreInfo}</a>}
             </div>
 
             <div className="card-actions">
-              <button className="btn primary" onClick={handleSubmit}>Submit</button>
+              {currentQuestionIndex > 0 && (
+                <button className="btn ghost" onClick={handlePreviousQuestion}>Previous</button>
+              )}
+              {!isLastQuestion ? (
+                <button className="btn primary" onClick={handleNextQuestion}>Next</button>
+              ) : (
+                <button className="btn primary" onClick={handleSubmit}>Submit</button>
+              )}
             </div>
           </div>
         )}
@@ -405,39 +432,49 @@ export default function SurveyPage() {
         .header h1{margin:0;font-size:28px}
         .sub{color:var(--muted);margin-top:6px}
         .card{background:var(--card);border-radius:12px;box-shadow:0 8px 30px rgba(15,23,42,0.06);padding:20px;margin:18px 0;border:1px solid rgba(15,23,42,0.03)}
-        .consent-text p,.consent-text ul{color:var(--muted);line-height:1.5}
-        .consent-actions{display:flex;gap:12px;margin-top:12px}
+        .card.centered{text-align:center}
+        .consent-actions{display:flex;flex-direction:column;gap:12px;margin-top:12px}
         .card-actions{margin-top:18px;display:flex;gap:12px;align-items:center}
-        .btn{padding:10px 14px;border-radius:8px;border:none;cursor:pointer;font-weight:600;background:transparent}
+        .btn{padding:10px 14px;border-radius:8px;border:none;cursor:pointer;font-weight:600;background:transparent;font-size:14px}
         .btn.primary{background:linear-gradient(90deg,var(--primary),#0056e6);color:white;box-shadow:0 6px 18px rgba(15,98,254,0.12)}
         .btn.ghost{border:1px solid rgba(15,23,42,0.08);background:transparent;color:#111827}
-        .btn.link{text-decoration:underline;background:transparent;color:var(--accent);font-weight:600}
+        .btn.link{text-decoration:underline;background:transparent;color:var(--accent);font-weight:600;padding:6px 8px}
+        .btn:disabled{opacity:0.5;cursor:not-allowed}
         .muted{color:var(--muted)}
         .small{font-size:13px}
-        .questions-list{display:flex;flex-direction:column;gap:12px}
-        .question-row{padding:12px;border-radius:8px;background:linear-gradient(180deg,#fff,#fbfdff);border:1px solid rgba(2,6,23,0.03)}
-        .q-text{font-weight:600;margin-bottom:8px}
-        .q-choices{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-        .choice{display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--muted);font-weight:500}
-        .choice input{transform:scale(1.05)}
+        .radio,.radio-inline{display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500}
+        .radio-inline{display:inline-flex;margin-right:16px}
+        .form-row{margin:16px 0}
+        .form-row label:first-child{display:block;font-weight:600;margin-bottom:8px}
+        .single-question{padding:24px;background:linear-gradient(180deg,#fff,#fbfdff);border-radius:12px;border:1px solid rgba(2,6,23,0.04)}
+        .q-text-large{font-size:18px;font-weight:600;margin-bottom:24px;line-height:1.5;color:#111827}
+        .q-choices-vertical{display:flex;flex-direction:column;gap:12px}
+        .choice-large{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:8px;border:2px solid rgba(15,23,42,0.08);cursor:pointer;transition:all 0.2s ease;background:#fff}
+        .choice-large:hover{border-color:var(--primary);background:#f8faff}
+        .choice-large input:checked ~ span{font-weight:600;color:var(--primary)}
+        .choice-large input{transform:scale(1.2);cursor:pointer}
+        .choice-large span{font-size:15px;color:#374151;font-weight:500}
         .more-link{margin-left:10px;color:var(--muted);font-size:13px;text-decoration:underline}
         footer.footer{text-align:center;color:var(--muted);margin-top:14px}
         .completion{margin-top:12px;padding:12px;background:#f3f6ff;border-radius:8px;border:1px solid rgba(15,98,254,0.06);text-align:center}
-        .completion code{background:#fff;padding:4px 8px;border-radius:6px}
+        .completion code{background:#fff;padding:4px 8px;border-radius:6px;font-family:monospace}
         .progress{height:8px;background:rgba(2,6,23,0.05);border-radius:999px;margin:8px 0 16px;overflow:hidden}
         .progress-inner{height:100%;background:linear-gradient(90deg,var(--primary),var(--accent));width:0%;transition:width .6s ease}
-        @media (max-width:720px){.container{padding:0 12px}}
+        @media (max-width:720px){.container{padding:0 12px}.choice-large{padding:12px}}
       `}</style>
     </div>
   );
 }
 
-function ProgressBar({ stage = "consent" }) {
+function ProgressBar({ stage = "consent", currentQ = 0, totalQ = 1 }) {
   let pct = 0;
   if (stage === "consent") pct = 10;
   if (stage === "demographics") pct = 30;
   if (stage === "video") pct = 60;
-  if (stage === "questions") pct = 80;
+  if (stage === "questions") {
+    const questionProgress = totalQ > 0 ? (currentQ / totalQ) * 20 : 0;
+    pct = 80 + questionProgress;
+  }
   if (stage === "complete") pct = 100;
   return (
     <div className="progress" aria-hidden>

@@ -1,16 +1,19 @@
 // pages/api/submit.js
 import { createClient } from "@supabase/supabase-js";
 
+// Initialize Supabase client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_KEY
 );
 
+// Generate a unique completion code
 function genCompletionCode() {
   return "C-" + Math.random().toString(36).substring(2, 10).toUpperCase();
 }
 
 export default async function handler(req, res) {
+  // Only allow POST requests
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -18,34 +21,37 @@ export default async function handler(req, res) {
   try {
     const payload = req.body;
 
+    // Validate required fields
     if (!payload || !payload.participantId) {
       return res.status(400).json({ error: "Missing participantId" });
     }
 
+    // Generate completion code
     const completionCode = genCompletionCode();
 
+    // Prepare data for insertion
     const insertObj = {
-      participantId: payload.participantId,
+      participant_id: payload.participantId,
       consent: payload.consent,
-      ageGroup: payload.ageGroup,
+      age_group: payload.ageGroup,
       gender: payload.gender,
-
-      assignedAdCode: payload.assignedAdCode,
-      assignedAdURL: payload.assignedAdURL,
-
-      startTime: payload.startTime,
-      endTime: payload.endTime,
-      watchSeconds: payload.watchSeconds,
-
-      clickedMoreInfo: payload.clickedMoreInfo,
-      moreInfoURL: payload.moreInfoURL,
-
+      assigned_ad_code: payload.assignedAdCode,
+      assigned_ad_url: payload.assignedAdURL,
+      start_time: payload.startTime,
+      end_time: payload.endTime,
+      watch_seconds: payload.watchSeconds,
+      clicked_more_info: payload.clickedMoreInfo,
+      more_info_url: payload.moreInfoURL,
       responses: payload.responses,
       timestamp: payload.timestamp,
-      completionCode
+      completion_code: completionCode
     };
 
-    const { data, error } = await supabase.from("responses").insert([insertObj]);
+    // Insert into Supabase
+    const { data, error } = await supabase
+      .from("responses")
+      .insert([insertObj])
+      .select();
 
     if (error) {
       console.error("Supabase insert error:", error);
@@ -55,13 +61,16 @@ export default async function handler(req, res) {
       });
     }
 
+    // Return success response
     return res.status(200).json({
       status: "ok",
       completionCode
     });
-
   } catch (err) {
     console.error("Submit error:", err);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ 
+      error: "Internal server error",
+      details: err.message 
+    });
   }
 }
