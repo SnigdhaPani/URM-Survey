@@ -337,10 +337,10 @@ export default function SurveyPage() {
           <div className="card">
             <h2>Please watch the video</h2>
             <div id="yt-player" style={{ display: "flex", justifyContent: "center" }} />
-            <p className="muted small">Questions will appear after the video ends. Please watch fully.</p>
-            <div style={{ marginTop: 12 }}>
+            <p className="muted small">Questions will appear after the video ends. Please watch the full video.</p>
+            {/* <div style={{ marginTop: 12 }}>
               <button className="btn ghost" onClick={() => { setClickedMoreInfo(true); window.open(assignedAd.moreInfo, "_blank", "noopener"); }}>Open product information (optional)</button>
-            </div>
+            </div> */}
           </div>
         )}
 
@@ -366,12 +366,20 @@ export default function SurveyPage() {
               </div>
 
               {/* More-info ONLY on last question & placed next to question (styled below) */}
-              {isLastQuestion && (
+              {/* {isLastQuestion && (
                 <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 12 }}>
                   <button className="btn link" onClick={handleMoreInfoClick}>More information about the product</button>
                   {assignedAd && <a className="more-link" href={assignedAd.moreInfo} target="_blank" rel="noreferrer">{assignedAd.moreInfo}</a>}
                 </div>
-              )}
+              )} */}
+              {isLastQuestion && (
+  <div style={{ marginTop: 18 }}>
+    <button className="btn link" onClick={handleMoreInfoClick}>
+      More information
+    </button>
+  </div>
+)}
+
             </div>
 
             <div className="card-actions" style={{ justifyContent: "space-between" }}>
@@ -416,7 +424,14 @@ export default function SurveyPage() {
         .consent-actions{display:flex;flex-direction:column;gap:12px;margin-top:12px}
         .card-actions{margin-top:18px;display:flex;gap:12px;align-items:center}
         .btn{padding:10px 16px;border-radius:10px;border:none;cursor:pointer;font-weight:700;background:transparent;font-size:14px}
-        .btn.primary{background:linear-gradient(90deg,var(--primary),#0056e6);color:white;box-shadow:0 8px 28px rgba(15,98,254,0.12)}
+        
+        .btn.primary {
+  background: #0f62fe !important;
+  color: #ffffff !important;
+  display: inline-block !important;
+  font-weight: 700 !important;
+}
+
         .btn.ghost{border:1px solid rgba(15,23,42,0.08);background:transparent;color:#111827}
         .btn.link{text-decoration:underline;background:transparent;color:var(--accent);font-weight:700;padding:8px 10px}
         .btn:disabled{opacity:0.5;cursor:not-allowed}
