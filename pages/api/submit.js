@@ -11,11 +11,13 @@ function genCompletionCode() {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== "POST")
+  if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
+  }
 
   try {
     const payload = req.body;
+
     if (!payload || !payload.participantId) {
       return res.status(400).json({ error: "Missing participantId" });
     }
@@ -26,30 +28,40 @@ export default async function handler(req, res) {
       participantId: payload.participantId,
       consent: payload.consent,
       ageGroup: payload.ageGroup,
-      ageRaw: payload.ageRaw,
       gender: payload.gender,
+
       assignedAdCode: payload.assignedAdCode,
       assignedAdURL: payload.assignedAdURL,
+
       startTime: payload.startTime,
       endTime: payload.endTime,
       watchSeconds: payload.watchSeconds,
+
       clickedMoreInfo: payload.clickedMoreInfo,
       moreInfoURL: payload.moreInfoURL,
+
       responses: payload.responses,
       timestamp: payload.timestamp,
-      completionCode,
+      completionCode
     };
 
     const { data, error } = await supabase.from("responses").insert([insertObj]);
 
     if (error) {
       console.error("Supabase insert error:", error);
-      return res.status(500).json({ error: "db_insert_failed", details: error.message });
+      return res.status(500).json({
+        error: "db_insert_failed",
+        details: error.message
+      });
     }
 
-    return res.status(200).json({ status: "ok", inserted: data, completionCode });
+    return res.status(200).json({
+      status: "ok",
+      completionCode
+    });
+
   } catch (err) {
-    console.error("submit error:", err);
+    console.error("Submit error:", err);
     return res.status(500).json({ error: err.message });
   }
 }

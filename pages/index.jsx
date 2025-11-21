@@ -1,46 +1,39 @@
 // pages/index.jsx
 import { useEffect, useRef, useState } from "react";
-import * as XLSX from "xlsx";
 
-/*
-  EXCEL_URL points to the Excel file you uploaded in this environment.
-  Per your session, that path is:
-*/
-const EXCEL_URL = "/mnt/data/Urm survey questions.xlsx";
+const QUESTIONS_URL = "/data/questions.json"; // served statically from public/data/questions.json
 
 const VIDEO_MAP = {
   CE: {
     code: "CE",
     name: "Celebrity Endorsement",
     yt: "https://www.youtube.com/watch?v=CsCqkkjF-8E",
-    moreInfo: "https://www.sansaar.co.in/products",
+    moreInfo: "https://www.sansaar.co.in/products"
   },
   AC: {
     code: "AC",
     name: "Ad Creativity",
     yt: "http://youtube.com/shorts/cixvzLa0d1c",
-    moreInfo:
-      "https://www.amazon.in/stores/BIC-Cello/page/A84B777B-6C4A-43D2-9A96-0C8FF334DA33",
+    moreInfo: "https://www.amazon.in/stores/BIC-Cello/page/A84B777B-6C4A-43D2-9A96-0C8FF334DA33"
   },
   PP: {
     code: "PP",
     name: "Price Perception",
     yt: "https://www.youtube.com/watch?v=1ihGeitBI_4&t=42s",
-    moreInfo:
-      "https://www.mi.com/in/product-list/tv/?srsltid=AfmBOoqXmnHU1VFFP7Jb4GlY_eZBIpR7m_fKcfu7A2cSsXdMo20mUkm5",
+    moreInfo: "https://www.mi.com/in/product-list/tv/?srsltid=AfmBOoqXmnHU1VFFP7Jb4GlY_eZBIpR7m_fKcfu7A2cSsXdMo20mUkm5"
   },
   BT: {
     code: "BT",
     name: "Brand Trust",
     yt: "https://www.youtube.com/watch?v=LcGPI2tV2yY",
-    moreInfo: "https://www.apple.com/in/",
+    moreInfo: "https://www.apple.com/in/"
   },
   ST: {
     code: "ST",
     name: "Storytelling",
     yt: "https://www.youtube.com/watch?v=JDk3GQkTyN4&list=PLXLT0cAAZyduzk5U5a43xdgrZY6fBCjMN&index=37",
-    moreInfo: "https://havells.com/home-electricals/flexible-cables.html",
-  },
+    moreInfo: "https://havells.com/home-electricals/flexible-cables.html"
+  }
 };
 
 const LIKERT = [
@@ -48,7 +41,7 @@ const LIKERT = [
   "Disagree",
   "Neutral",
   "Agree",
-  "Strongly agree",
+  "Strongly agree"
 ];
 
 function extractYouTubeID(url) {
@@ -65,105 +58,80 @@ function extractYouTubeID(url) {
 }
 
 export default function SurveyPage() {
-  const [stage, setStage] = useState("consent"); // consent -> demographics -> video -> questions -> complete / exit
+  const [stage, setStage] = useState("consent"); // consent -> demographics -> video -> questions -> complete/exit
   const [consent, setConsent] = useState(null);
 
-  const [ageGroup, setAgeGroup] = useState(null);
-  const [ageRaw, setAgeRaw] = useState("");
+  // demographics
+  const [ageGroup, setAgeGroup] = useState(null); // only 18-25 or 26-35 choices
   const [gender, setGender] = useState(null);
 
-  const [questions, setQuestions] = useState([]);
-  const [perAdFinalQuestion, setPerAdFinalQuestion] = useState({});
-
-  const [assignedAdCode, setAssignedAdCode] = useState(null);
+  // questions data
+  const [questionsByType, setQuestionsByType] = useState({});
+  const [assignedType, setAssignedType] = useState(null);
   const [assignedAd, setAssignedAd] = useState(null);
 
-  const ytPlayerRef = useRef(null);
+  // youtube player
+  const ytRef = useRef(null);
 
-  const [videoStartedAt, setVideoStartedAt] = useState(null);
-  const [videoEndedAt, setVideoEndedAt] = useState(null);
+  // timing
+  const [startTime, setStartTime] = useState(null);
+  const [endTime, setEndTime] = useState(null);
   const [watchSeconds, setWatchSeconds] = useState(null);
 
+  // answers, more-info
   const [answers, setAnswers] = useState({});
   const [clickedMoreInfo, setClickedMoreInfo] = useState(false);
 
-  const [participantId] = useState(
-    "p_" + Math.random().toString(36).substring(2, 9)
-  );
+  // participant id & completion
+  const [participantId] = useState("p_" + Math.random().toString(36).slice(2, 9));
   const [completionCode, setCompletionCode] = useState(null);
 
-  // Load Excel and parse questions + per-ad final questions
+  // load questions.json
   useEffect(() => {
-    async function loadExcel() {
+    async function load() {
       try {
-        const res = await fetch(EXCEL_URL);
-        if (!res.ok) throw new Error("Excel not found");
-        const arrayBuffer = await res.arrayBuffer();
-        const wb = XLSX.read(arrayBuffer, { type: "array" });
-        const sheet = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
-        const genQs = [];
-        const adFinal = {};
-        for (let r of rows) {
-          const qText = r && r[0] ? String(r[0]).trim() : null;
-          const b = r && r[1] ? String(r[1]).trim() : null;
-          if (!qText) continue;
-          if (b && ["CE", "AC", "PP", "BT", "ST"].includes(b)) {
-            adFinal[b] = qText;
-          } else {
-            genQs.push(qText);
-          }
-        }
-        setQuestions(genQs);
-        setPerAdFinalQuestion(adFinal);
+        const r = await fetch(QUESTIONS_URL);
+        const json = await r.json();
+        setQuestionsByType(json || {});
       } catch (err) {
-        console.error("Failed to load Excel:", err);
-        setQuestions([
-          "The ad made the product look appealing.",
-          "The ad was memorable.",
-          "The ad improved my impression of the brand.",
-        ]);
-        setPerAdFinalQuestion({
-          CE: "I would search for more information about the celebrity-endorsed product after watching this advertisement.",
-          AC: "I would search for more information about the product after watching this creative advertisement.",
-          PP: "I would search for more information about the product after watching this price-focused advertisement.",
-          BT: "I would search for more information about the product after watching this brand-focused advertisement.",
-          ST: "I would search for more information about the product after watching this storytelling advertisement.",
-        });
+        console.error("Failed to load questions.json", err);
       }
     }
-    loadExcel();
+    load();
   }, []);
 
-  // Age gating: if under 18 or over 35 exit
+  // Consent (no age on consent page)
   function handleConsentContinue() {
     if (!consent) {
-      alert("You must agree to participate to continue.");
+      alert("Please choose whether you agree to participate.");
       return;
     }
-    const parsed = ageRaw ? parseInt(ageRaw, 10) : null;
-    if (parsed && (parsed < 18 || parsed > 35)) {
-      setStage("age-exit");
+    if (!consent) {
+      setStage("exit");
       return;
     }
-    // If they will select age group on next page, proceed
-    setStage("demographics-confirm");
+    setStage("demographics");
   }
 
-  // Randomly assign ad and init YT player
-  function assignRandomAdAndPlay() {
+  // Assign random type (only when valid demographics selected)
+  function startExperiment() {
+    if (!ageGroup || !gender) {
+      alert("Please select age group and gender.");
+      return;
+    }
+    // choose random
     const keys = Object.keys(VIDEO_MAP);
-    const chosenCode = keys[Math.floor(Math.random() * keys.length)];
-    const ad = VIDEO_MAP[chosenCode];
-    setAssignedAdCode(chosenCode);
-    setAssignedAd(ad);
+    const chosen = keys[Math.floor(Math.random() * keys.length)];
+    setAssignedType(chosen);
+    setAssignedAd(VIDEO_MAP[chosen]);
     setStage("video");
-    setTimeout(() => initYouTubePlayer(ad.yt), 300);
+
+    // init YT player shortly after render
+    setTimeout(() => initYT(VIDEO_MAP[chosen].yt), 300);
   }
 
-  // Init YouTube IFrame API and watch for end
-  async function initYouTubePlayer(ytUrl) {
+  // init YT iframe API
+  async function initYT(url) {
     if (!window.YT) {
       const tag = document.createElement("script");
       tag.src = "https://www.youtube.com/iframe_api";
@@ -178,47 +146,50 @@ export default function SurveyPage() {
       });
     }
 
+    // destroy previous if exists
     try {
-      if (ytPlayerRef.current && ytPlayerRef.current.destroy) {
-        ytPlayerRef.current.destroy();
-        ytPlayerRef.current = null;
+      if (ytRef.current && ytRef.current.destroy) {
+        ytRef.current.destroy();
+        ytRef.current = null;
       }
     } catch {}
 
-    const vid = extractYouTubeID(ytUrl);
+    const vid = extractYouTubeID(url);
     if (!vid) {
-      console.error("Cannot parse YouTube ID for", ytUrl);
+      console.error("Cannot extract youtube id", url);
       return;
     }
 
-    ytPlayerRef.current = new window.YT.Player("yt-player", {
+    ytRef.current = new window.YT.Player("yt-player", {
       height: "360",
       width: "640",
       videoId: vid,
       playerVars: { rel: 0, modestbranding: 1 },
       events: {
-        onReady: (ev) => {
+        onReady: (e) => {
           try {
-            ev.target.playVideo();
-            setVideoStartedAt(new Date().toISOString());
+            e.target.playVideo();
+            setStartTime(new Date().toISOString());
           } catch {}
         },
         onStateChange: (e) => {
           if (e.data === 0) {
+            // ended
             const end = new Date().toISOString();
-            setVideoEndedAt(end);
+            setEndTime(end);
             let secs = null;
             try {
-              secs = Math.round(ytPlayerRef.current.getCurrentTime());
+              secs = Math.round(ytRef.current.getCurrentTime());
             } catch {}
             setWatchSeconds(secs);
             setStage("questions");
           }
-        },
-      },
+        }
+      }
     });
   }
 
+  // handle more-info click
   function handleMoreInfoClick() {
     setClickedMoreInfo(true);
     if (assignedAd && assignedAd.moreInfo) {
@@ -226,200 +197,251 @@ export default function SurveyPage() {
     }
   }
 
-  function setAnswerFor(index, numeric) {
-    setAnswers((p) => ({ ...p, [index]: numeric }));
+  // answer handling
+  function setAnswer(qIndex, numeric) {
+    setAnswers((p) => ({ ...p, [qIndex]: numeric }));
   }
 
-  function setLastQuestionAnswer(numeric) {
-    setAnswers((p) => ({ ...p, last: numeric }));
-  }
-
+  // submit saved payload to /api/submit
   async function handleSubmit() {
+    // build responses: flatten questions for assignedType
+    const qList = questionsByType[assignedType] || [];
     const responsesObj = {};
-    questions.forEach((q, idx) => {
+    qList.forEach((qText, idx) => {
       const v = answers[idx] ?? null;
-      responsesObj[q] = v !== null ? { numeric: v, text: LIKERT[v - 1] } : { numeric: null, text: null };
+      responsesObj[qText] = v !== null ? { numeric: v, text: LIKERT[v - 1] } : { numeric: null, text: null };
     });
-
-    const finalQText = perAdFinalQuestion[assignedAdCode] || "I would search for more information about the product after watching this advertisement.";
-    const lastVal = answers.last ?? null;
-    responsesObj[finalQText] = lastVal !== null ? { numeric: lastVal, text: LIKERT[lastVal - 1] } : { numeric: null, text: null };
 
     const payload = {
       participantId,
       consent,
       ageGroup,
-      ageRaw,
       gender,
-      assignedAdCode,
+      assignedAdCode: assignedType,
       assignedAdURL: assignedAd ? assignedAd.yt : null,
-      startTime: videoStartedAt,
-      endTime: videoEndedAt,
+      startTime,
+      endTime,
       watchSeconds,
       clickedMoreInfo,
       moreInfoURL: assignedAd ? assignedAd.moreInfo : null,
       responses: responsesObj,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     };
 
     try {
-      const r = await fetch("/api/submit", {
+      const res = await fetch("/api/submit", {
         method: "POST",
         body: JSON.stringify(payload),
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" }
       });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data?.error || "submit failed");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Submit failed");
       setCompletionCode(data.completionCode || null);
       setStage("complete");
     } catch (err) {
       console.error(err);
-      alert("Submission failed. Please try again.");
+      alert("Failed to submit, please try again.");
     }
   }
 
-  // Render stages
-  if (stage === "age-exit") {
-    return (
-      <div style={{ padding: 20, maxWidth: 800, margin: "0 auto" }}>
-        <h2>Thank you</h2>
-        <p>You indicated that you are outside the eligible age range for this study. Thank you for your time.</p>
-      </div>
-    );
-  }
+  // render UI
+  return (
+    <div className="page">
+      <div className="container">
+        <header className="header">
+          <h1>Ad Response Survey</h1>
+          <p className="sub">You will watch one short video and answer questions about it. Estimated time: 10–15 minutes.</p>
+        </header>
 
-  if (stage === "consent") {
-    return (
-      <div style={{ padding: 20, maxWidth: 900, margin: "0 auto" }}>
-        <h2>PARTICIPANT CONSENT FORM</h2>
-        <p><strong>Study Title:</strong> Understanding Audience Responses to Different Advertisements</p>
-        <p><strong>Researchers:</strong> Snigdha Pani, Deepti Koranga, Prakash Bhabad</p>
-        <p><strong>Institution:</strong> IIIT Hyderabad</p>
+        <ProgressBar stage={stage} />
 
-        <p>Purpose: You are invited to take part in this study. The purpose is to understand how people perceive and respond to different types of advertisements...</p>
+        {stage === "consent" && (
+          <div className="card">
+            <h2>PARTICIPANT CONSENT FORM</h2>
 
-        <div style={{ marginTop: 12 }}>
-          <label style={{display:"block", marginBottom:8}}>
-            <input type="radio" name="consent" onChange={() => setConsent(true)} /> I Agree to participate in this study
-          </label>
-          <label style={{display:"block", marginBottom:8}}>
-            <input type="radio" name="consent" onChange={() => setConsent(false)} /> I Do Not Agree
-          </label>
-        </div>
+            <p><strong>Study Title:</strong> Understanding Audience Responses to Different Advertisements</p>
+            <p><strong>Researchers:</strong> Snigdha Pani, Deepti Koranga, Prakash Bhabad</p>
+            <p><strong>Institution:</strong> IIIT Hyderabad</p>
 
-        <div style={{ marginTop: 12 }}>
-          <label style={{ display: "block", marginBottom: 8 }}>
-            Enter your age (optional): <input type="number" value={ageRaw} onChange={(e)=>setAgeRaw(e.target.value)} style={{width:80}} />
-          </label>
-          <p style={{ fontSize: 13, color: "#666" }}>Or click Continue and select an age group on the next screen (18-25 or 26-35).</p>
-        </div>
+            <h3>Purpose of the Study</h3>
+            <p>You are invited to take part in this study. The purpose is to understand how people perceive and respond to different types of advertisements. We are interested in learning what aspects viewers notice, how they interpret the content, and how these elements shape their general impressions of the brands or products shown. This study does not test your knowledge or performance — we are only interested in your natural reactions and opinions.</p>
 
-        <div style={{ marginTop: 12 }}>
-          <button onClick={handleConsentContinue}>Continue</button>
-        </div>
-      </div>
-    );
-  }
+            <h3>What Participation Involves</h3>
+            <ol>
+              <li>View a short advertisement video.</li>
+              <li>Answer questions about your impressions, feelings, and reactions.</li>
+              <li>Provide honest and voluntary feedback based on your experience.</li>
+              <li>The estimated time to complete the study is 10-15 minutes.</li>
+            </ol>
 
-  if (stage === "demographics-confirm") {
-    return (
-      <div style={{ padding: 20, maxWidth: 800, margin: "0 auto" }}>
-        <h3>Demographics</h3>
-        <p>Please select your age group:</p>
-        {["18-25", "26-35"].map((g) => (
-          <label key={g} style={{ marginRight: 12 }}>
-            <input type="radio" name="agegroup" onChange={() => setAgeGroup(g)} /> {g}
-          </label>
-        ))}
+            <h3>Voluntary Participation</h3>
+            <p>Your participation is voluntary. You may stop at any time without penalty.</p>
 
-        <div style={{ marginTop: 12 }}>
-          <p>Gender:</p>
-          {["Male","Female","Other","Prefer not to say"].map((g) => (
-            <label key={g} style={{ marginRight: 12 }}>
-              <input type="radio" name="gender" onChange={() => setGender(g)} /> {g}
-            </label>
-          ))}
-        </div>
+            <h3>Privacy, Confidentiality & Data Use</h3>
+            <ol>
+              <li>Your identity will not be collected or linked to your responses.</li>
+              <li>All information you provide will be kept confidential and used only for research purposes.</li>
+              <li>Your responses will be stored securely and will not be shared or published in a way that identifies you.</li>
+              <li>Data will not be used for any purpose outside this study.</li>
+            </ol>
 
-        <div style={{ marginTop: 14 }}>
-          <button disabled={!ageGroup || !gender} onClick={assignRandomAdAndPlay}>Start the Video</button>
-        </div>
-      </div>
-    );
-  }
+            <h3>Right to Withdraw</h3>
+            <p>You may withdraw from the study at any time. If you withdraw, your responses will not be included in analysis.</p>
 
-  if (stage === "video" && assignedAd) {
-    return (
-      <div style={{ padding: 20, maxWidth: 900, margin: "0 auto" }}>
-        <h3>Now watching: {assignedAd.name}</h3>
-        <div id="yt-player"></div>
-        <p>Please watch the video fully. The survey questions will appear after the video ends.</p>
+            <h3>Contact</h3>
+            <p>Researcher: Prakash Bhabad — <a href="mailto:prakash.bhabad@students.iiit.ac.in">prakash.bhabad@students.iiit.ac.in</a></p>
 
-        <div style={{ marginTop: 12 }}>
-          <button onClick={handleMoreInfoClick}>Open product information (opens in new tab)</button>
-          <span style={{ marginLeft: 12, color: clickedMoreInfo ? "green" : "#666" }}>{clickedMoreInfo ? "You opened the product page" : "Optional: view product info"}</span>
-        </div>
-      </div>
-    );
-  }
+            <div className="consent-actions">
+              <label className="radio"><input type="radio" name="consent" onChange={() => setConsent(true)} /> I Agree to participate in this study</label>
+              <label className="radio"><input type="radio" name="consent" onChange={() => setConsent(false)} /> I Do Not Agree</label>
+            </div>
 
-  if (stage === "questions") {
-    const finalQuestionText = perAdFinalQuestion[assignedAdCode] || "I would search for more information about the product after watching this advertisement.";
-    return (
-      <div style={{ padding: 20, maxWidth: 900, margin: "0 auto" }}>
-        <h3>Survey Questions</h3>
-        <p>Please rate the following statements:</p>
-
-        {questions.map((q, idx) => (
-          <div key={idx} style={{ marginBottom: 14, padding: 10, borderRadius: 6, background: "#fff" }}>
-            <div style={{ marginBottom: 8 }}><strong>{q}</strong></div>
-            <div>
-              {LIKERT.map((label, li) => (
-                <label key={li} style={{ marginRight: 12 }}>
-                  <input type="radio" name={`q-${idx}`} checked={answers[idx] === li+1} onChange={() => setAnswerFor(idx, li+1)} /> {label}
-                </label>
-              ))}
+            <div className="card-actions">
+              <button className="btn primary" onClick={handleConsentContinue} disabled={!consent}>Continue</button>
+              <button className="btn ghost" onClick={() => { setConsent(false); setStage("exit"); }}>Decline</button>
             </div>
           </div>
-        ))}
+        )}
 
-        <div style={{ marginTop: 12, padding: 10, borderRadius: 6, background: "#fff" }}>
-          <div style={{ marginBottom: 8 }}><strong>{finalQuestionText}</strong></div>
-          <div>
-            {LIKERT.map((label, li) => (
-              <label key={li} style={{ marginRight: 12 }}>
-                <input type="radio" name="final-search" checked={answers.last === li+1} onChange={() => setLastQuestionAnswer(li+1)} /> {label}
-              </label>
-            ))}
-          </div>
-
-          <div style={{ marginTop: 10 }}>
-            <button onClick={handleMoreInfoClick}>Open product information</button>
-            <span style={{ marginLeft: 12 }}>{assignedAd && <a href={assignedAd.moreInfo} target="_blank" rel="noreferrer">{assignedAd.moreInfo}</a>}</span>
-          </div>
-        </div>
-
-        <div style={{ marginTop: 18 }}>
-          <button onClick={handleSubmit}>Submit responses</button>
-        </div>
-      </div>
-    );
-  }
-
-  if (stage === "complete") {
-    return (
-      <div style={{ padding: 20, maxWidth: 800, margin: "0 auto" }}>
-        <h2>Thank you!</h2>
-        <p>Your responses have been recorded.</p>
-        {completionCode && (
-          <div style={{ marginTop: 12, padding: 10, background: "#f6f6f6", borderRadius: 6 }}>
-            <strong>Completion code:</strong> <span style={{ fontFamily: "monospace" }}>{completionCode}</span>
-            <p style={{ fontSize: 13, color: "#666" }}>Please copy this completion code and submit it to the panel (if required).</p>
+        {stage === "exit" && (
+          <div className="card centered">
+            <h2>Thank you</h2>
+            <p>Thank you for your time.</p>
           </div>
         )}
-      </div>
-    );
-  }
 
-  return null;
+        {stage === "demographics" && (
+          <div className="card">
+            <h2>Demographics</h2>
+
+            <div className="form-row">
+              <label>Age group</label>
+              <div>
+                <label className="radio-inline"><input type="radio" name="age" onChange={() => setAgeGroup("18-25")} /> 18–25</label>
+                <label className="radio-inline"><input type="radio" name="age" onChange={() => setAgeGroup("26-35")} /> 26–35</label>
+              </div>
+            </div>
+
+            <div className="form-row">
+              <label>Gender</label>
+              <div>
+                <label className="radio-inline"><input type="radio" name="gen" onChange={() => setGender("Male")} /> Male</label>
+                <label className="radio-inline"><input type="radio" name="gen" onChange={() => setGender("Female")} /> Female</label>
+                <label className="radio-inline"><input type="radio" name="gen" onChange={() => setGender("Other")} /> Other</label>
+                <label className="radio-inline"><input type="radio" name="gen" onChange={() => setGender("Prefer not to say")} /> Prefer not to say</label>
+              </div>
+            </div>
+
+            <div className="card-actions">
+              <button className="btn primary" onClick={startExperiment} disabled={!ageGroup || !gender}>Start Video</button>
+            </div>
+          </div>
+        )}
+
+        {stage === "video" && assignedAd && (
+          <div className="card">
+            <h2>Now watching: {assignedAd.name}</h2>
+            <div id="yt-player" style={{ display: "flex", justifyContent: "center" }}></div>
+            <p className="muted small">Please watch the video fully. The questionnaire will appear after the video ends.</p>
+
+            <div style={{ marginTop: 12 }}>
+              <button className="btn ghost" onClick={handleMoreInfoClick}>Open product information (optional)</button>
+              <span style={{ marginLeft: 12 }}>{clickedMoreInfo ? "Opened" : "Optional"}</span>
+            </div>
+          </div>
+        )}
+
+        {stage === "questions" && (
+          <div className="card">
+            <h2>Questions — {VIDEO_MAP[assignedType].name}</h2>
+            <p className="muted">Rate each statement</p>
+
+            <div className="questions-list">
+              {(questionsByType[assignedType] || []).map((qText, idx) => (
+                <div className="question-row" key={idx}>
+                  <div className="q-text">{qText}</div>
+                  <div className="q-choices">
+                    {LIKERT.map((label, li) => (
+                      <label key={li} className="choice">
+                        <input type="radio" name={`q-${idx}`} checked={answers[idx] === li + 1} onChange={() => setAnswer(idx, li + 1)} />
+                        <span>{label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* More info button shown under all questions (Option 2) */}
+            <div style={{ marginTop: 12 }}>
+              <button className="btn link" onClick={handleMoreInfoClick}>More information about the product</button>
+              {assignedAd && <a className="more-link" href={assignedAd.moreInfo} target="_blank" rel="noreferrer" style={{ marginLeft: 12 }}>{assignedAd.moreInfo}</a>}
+            </div>
+
+            <div className="card-actions">
+              <button className="btn primary" onClick={handleSubmit}>Submit</button>
+            </div>
+          </div>
+        )}
+
+        {stage === "complete" && (
+          <div className="card centered">
+            <h2>Thank you!</h2>
+            <p>Your responses have been recorded.</p>
+            {completionCode && <div className="completion"><strong>Completion code:</strong> <code>{completionCode}</code><p className="muted small">Copy this code to claim credit (if required).</p></div>}
+          </div>
+        )}
+
+        <footer className="footer">
+          <small>IIIT Hyderabad — Ad Response Study</small>
+        </footer>
+      </div>
+
+      <style jsx>{`
+        :root{--bg:#f6f8fb;--card:#fff;--muted:#6b7280;--primary:#0f62fe;--accent:#7c3aed;}
+        .page{min-height:100vh;background:linear-gradient(180deg,#f7fbff 0%,var(--bg)100%);padding:28px;}
+        .container{max-width:980px;margin:0 auto;font-family:Inter,system-ui,Arial;color:#111827}
+        .header{text-align:center;margin-bottom:10px}
+        .header h1{margin:0;font-size:28px}
+        .sub{color:var(--muted);margin-top:6px}
+        .card{background:var(--card);border-radius:12px;box-shadow:0 8px 30px rgba(15,23,42,0.06);padding:20px;margin:18px 0;border:1px solid rgba(15,23,42,0.03)}
+        .consent-text p,.consent-text ul{color:var(--muted);line-height:1.5}
+        .consent-actions{display:flex;gap:12px;margin-top:12px}
+        .card-actions{margin-top:18px;display:flex;gap:12px;align-items:center}
+        .btn{padding:10px 14px;border-radius:8px;border:none;cursor:pointer;font-weight:600;background:transparent}
+        .btn.primary{background:linear-gradient(90deg,var(--primary),#0056e6);color:white;box-shadow:0 6px 18px rgba(15,98,254,0.12)}
+        .btn.ghost{border:1px solid rgba(15,23,42,0.08);background:transparent;color:#111827}
+        .btn.link{text-decoration:underline;background:transparent;color:var(--accent);font-weight:600}
+        .muted{color:var(--muted)}
+        .small{font-size:13px}
+        .questions-list{display:flex;flex-direction:column;gap:12px}
+        .question-row{padding:12px;border-radius:8px;background:linear-gradient(180deg,#fff,#fbfdff);border:1px solid rgba(2,6,23,0.03)}
+        .q-text{font-weight:600;margin-bottom:8px}
+        .q-choices{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+        .choice{display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--muted);font-weight:500}
+        .choice input{transform:scale(1.05)}
+        .more-link{margin-left:10px;color:var(--muted);font-size:13px;text-decoration:underline}
+        footer.footer{text-align:center;color:var(--muted);margin-top:14px}
+        .completion{margin-top:12px;padding:12px;background:#f3f6ff;border-radius:8px;border:1px solid rgba(15,98,254,0.06);text-align:center}
+        .completion code{background:#fff;padding:4px 8px;border-radius:6px}
+        .progress{height:8px;background:rgba(2,6,23,0.05);border-radius:999px;margin:8px 0 16px;overflow:hidden}
+        .progress-inner{height:100%;background:linear-gradient(90deg,var(--primary),var(--accent));width:0%;transition:width .6s ease}
+        @media (max-width:720px){.container{padding:0 12px}}
+      `}</style>
+    </div>
+  );
+}
+
+function ProgressBar({ stage = "consent" }) {
+  let pct = 0;
+  if (stage === "consent") pct = 10;
+  if (stage === "demographics") pct = 30;
+  if (stage === "video") pct = 60;
+  if (stage === "questions") pct = 80;
+  if (stage === "complete") pct = 100;
+  return (
+    <div className="progress" aria-hidden>
+      <div className="progress-inner" style={{ width: `${pct}%` }} />
+    </div>
+  );
 }
