@@ -263,7 +263,7 @@ export default function SurveyPage() {
         </header>
 
         <ProgressBar stage={stage} currentQ={currentQuestionIndex} totalQ={totalQuestions} />
-
+{/* 
         {stage === "consent" && (
           <div className="card">
             <h2>PARTICIPANT CONSENT FORM</h2>
@@ -296,7 +296,69 @@ export default function SurveyPage() {
               <button className="btn ghost" onClick={() => { setConsent(false); setStage("exit"); }}>Decline</button>
             </div>
           </div>
-        )}
+        )} */}
+        {stage === "consent" && (
+  <div className="card">
+    <h2>PARTICIPANT CONSENT FORM</h2>
+
+    <p><strong>Study Title:</strong> Understanding Audience Responses to Different Advertisements</p>
+    <p><strong>Researchers:</strong> Snigdha Pani, Deepti Koranga, Prakash Bhabad</p>
+    <p><strong>Institution:</strong> IIIT Hyderabad</p>
+
+    <h3>Purpose of the Study</h3>
+    <p>You are invited to take part in this study. The purpose is to understand how people perceive and respond to different types of advertisements. We are interested in learning what aspects viewers notice, how they interpret the content, and how these elements shape their general impressions of the brands or products shown. This study does not test your knowledge or performance — we are only interested in your natural reactions and opinions.</p>
+
+    <h3>What Participation Involves</h3>
+    <ol>
+      <li>View a short advertisement video.</li>
+      <li>Answer questions about your impressions, feelings, and reactions.</li>
+      <li>Provide honest and voluntary feedback based on your experience.</li>
+      <li>The estimated time to complete the study is 10–15 minutes.</li>
+    </ol>
+
+    <h3>Voluntary Participation</h3>
+    <p>Your participation is completely voluntary. You may choose not to answer any question and may stop participating at any time without any penalty or consequence.</p>
+
+    <h3>Risks & Benefits</h3>
+    <p>Risks: This study involves minimal or no risk.</p>
+    <p>Benefits: You may not receive a direct personal benefit, but your participation will help improve understanding of how audiences engage with advertisements, which can support better research and design practices.</p>
+
+    <h3>Privacy, Confidentiality & Data Use</h3>
+    <ol>
+      <li>Your identity will not be collected or linked to your responses.</li>
+      <li>All information you provide will be kept confidential and used only for research purposes.</li>
+      <li>Your responses will be stored securely and will not be shared or published in a way that identifies you.</li>
+      <li>Data will not be used for any purpose outside this study.</li>
+    </ol>
+
+    <h3>Right to Withdraw</h3>
+    <p>You may withdraw from the study at any time, even after starting. If you choose to withdraw, your responses will not be included in the analysis.</p>
+
+    <h3>By selecting “I Agree,” you confirm that:</h3>
+    <ol>
+      <li>You have read and understood the information provided.</li>
+      <li>Your questions (if any) have been answered.</li>
+      <li>You voluntarily agree to participate in this study.</li>
+      <li>You understand that you can withdraw at any time without penalty.</li>
+    </ol>
+
+    <div className="consent-actions">
+      <label className="radio"><input type="radio" name="consent" onChange={() => setConsent(true)} /> I Agree to participate in this study</label>
+      <label className="radio"><input type="radio" name="consent" onChange={() => setConsent(false)} /> I Do Not Agree</label>
+    </div>
+
+    <h3>Contact Information</h3>
+    <p>If you have any questions about the study, please contact:</p>
+    <p><strong>Researcher:</strong> Prakash Bhabad</p>
+    <p><strong>Email:</strong> <a href="mailto:prakash.bhabad@students.iiit.ac.in">prakash.bhabad@students.iiit.ac.in</a></p>
+
+    <div className="card-actions">
+      <button className="btn primary" onClick={handleConsentContinue} disabled={consent === null}>Continue</button>
+      <button className="btn ghost" onClick={() => { setConsent(false); setStage("exit"); }}>Decline</button>
+    </div>
+  </div>
+)}
+
 
         {stage === "exit" && (
           <div className="card centered">
@@ -460,19 +522,58 @@ export default function SurveyPage() {
   );
 }
 
+// function ProgressBar({ stage = "consent", currentQ = 0, totalQ = 1 }) {
+//   let pct = 0;
+//   if (stage === "consent") pct = 8;
+//   if (stage === "demographics") pct = 28;
+//   if (stage === "video") pct = 58;
+//   if (stage === "questions") {
+//     const questionProgress = totalQ > 0 ? ((currentQ + 1) / totalQ) * 40 : 0;
+//     pct = 58 + questionProgress;
+//   }
+//   if (stage === "complete") pct = 100;
+//   return (
+//     <div className="progress" aria-hidden>
+//       <div className="progress-inner" style={{ width: `${pct}%` }} />
+//     </div>
+//   );
+// }
+
 function ProgressBar({ stage = "consent", currentQ = 0, totalQ = 1 }) {
   let pct = 0;
-  if (stage === "consent") pct = 8;
-  if (stage === "demographics") pct = 28;
-  if (stage === "video") pct = 58;
+
+  if (stage === "consent") pct = 5;
+  if (stage === "demographics") pct = 20;
+  if (stage === "video") pct = 40;
+
   if (stage === "questions") {
-    const questionProgress = totalQ > 0 ? ((currentQ + 1) / totalQ) * 40 : 0;
-    pct = 58 + questionProgress;
+    const answered = currentQ + 1;
+    pct = 40 + (answered / totalQ) * 55; // majority of bar used for questions
   }
+
   if (stage === "complete") pct = 100;
+
   return (
-    <div className="progress" aria-hidden>
-      <div className="progress-inner" style={{ width: `${pct}%` }} />
+    <div style={{ margin: "20px 0" }}>
+      <div style={{
+        height: "10px",
+        width: "100%",
+        background: "#e5e7eb",
+        borderRadius: "8px",
+        overflow: "hidden"
+      }}>
+        <div style={{
+          height: "100%",
+          width: `${pct}%`,
+          background: "linear-gradient(90deg,#0f62fe,#7c3aed)",
+          transition: "width 0.4s ease"
+        }} />
+      </div>
+      {stage === "questions" && (
+        <p style={{ marginTop: "6px", color: "#6b7280", fontSize: "13px", textAlign: "center" }}>
+          Question {currentQ + 1} of {totalQ}
+        </p>
+      )}
     </div>
   );
 }
