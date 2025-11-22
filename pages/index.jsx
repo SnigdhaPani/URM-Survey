@@ -3,6 +3,10 @@ import { useEffect, useRef, useState } from "react";
 
 const QUESTIONS_URL = "/data/questions.json"; // ensure public/data/questions.json exists
 
+const FORM_POST_URL =
+"https://docs.google.com/forms/u/0/d/e/1FAIpQLSfDXHynpUhiCcm0PZdz59Od5MHt8dcNmMeU7hFGS6GEomTPTw/formResponse";
+const RESPONSES_ENTRY_ID = "889800321"; // from your form (you provided this id)
+
 const VIDEO_MAP = {
   CE: { code: "CE", yt: "https://www.youtube.com/watch?v=CsCqkkjF-8E", moreInfo: "https://www.sansaar.co.in/products" },
   AC: { code: "AC", yt: "http://youtube.com/shorts/cixvzLa0d1c", moreInfo: "https://www.amazon.in/stores/BIC-Cello/page/A84B777B-6C4A-43D2-9A96-0C8FF334DA33" },
@@ -139,10 +143,10 @@ export default function SurveyPage() {
     }
 
     ytRef.current = new window.YT.Player("yt-player", {
-      height: "380",
-      width: "720",
+      height: "100%",
+      width: "100%",
       videoId: vid,
-      playerVars: { rel: 0, modestbranding: 1 },
+      playerVars: { rel: 0, modestbranding: 1, playsinline: 1 },
       events: {
         onReady: (e) => {
           try {
@@ -199,15 +203,59 @@ export default function SurveyPage() {
     }
   }
 
+  // async function handleSubmit() {
+  //   const qList = questionsByType?.[assignedType] || [];
+  //   // Ensure all questions answered before submit
+  //   for (let i = 0; i < qList.length; i++) {
+  //     if (answers[i] === undefined) {
+  //       alert(`Please answer question ${i + 1} before submitting.`);
+  //       setCurrentQuestionIndex(i);
+  //       return;
+  //     }
+  //   }
+
+  //   const responsesObj = {};
+  //   qList.forEach((q, i) => {
+  //     const v = answers[i] ?? null;
+  //     responsesObj[q] = v !== null ? { numeric: v, text: LIKERT[v - 1] } : { numeric: null, text: null };
+  //   });
+
+  //   const payload = {
+  //     participantId,
+  //     consent,
+  //     ageGroup,
+  //     gender,
+  //     assignedAdCode: assignedType,
+  //     assignedAdURL: assignedAd?.yt ?? null,
+  //     startTime,
+  //     endTime,
+  //     watchSeconds,
+  //     clickedMoreInfo,
+  //     moreInfoURL: assignedAd?.moreInfo ?? null,
+  //     responses: responsesObj,
+  //     timestamp: new Date().toISOString()
+  //   };
+
+  //   try {
+  //     const res = await fetch("/api/submit", {
+  //       method: "POST",
+  //       body: JSON.stringify(payload),
+  //       headers: { "Content-Type": "application/json" }
+  //     });
+  //     const data = await res.json();
+  //     if (!res.ok) throw new Error(data?.error || "Submit failed");
+  //     setCompletionCode(data.completionCode || null);
+  //     setStage("complete");
+  //     window.scrollTo({ top: 0, behavior: "smooth" });
+  //   } catch (err) {
+  //     console.error("Submit error:", err);
+  //     alert("Submission failed: " + (err.message || "unknown error"));
+  //   }
+  // }
   async function handleSubmit() {
     const qList = questionsByType?.[assignedType] || [];
-    // Ensure all questions answered before submit
     for (let i = 0; i < qList.length; i++) {
-      if (answers[i] === undefined) {
-        alert(`Please answer question ${i + 1} before submitting.`);
-        setCurrentQuestionIndex(i);
-        return;
-      }
+      if (answers[i] === undefined) { alert(`Please answer question ${i + 1} before submitting.`); setCurrentQuestionIndex(i); return; }
     }
 
     const responsesObj = {};
@@ -232,20 +280,21 @@ export default function SurveyPage() {
       timestamp: new Date().toISOString()
     };
 
+    if (!RESPONSES_ENTRY_ID || RESPONSES_ENTRY_ID === "PUT_RESPONSES_ENTRY_ID_HERE") {
+      alert("Please set RESPONSES_ENTRY_ID at the top of this file (the Google Form entry id for responses_json).");
+      return;
+    }
+
     try {
-      const res = await fetch("/api/submit", {
-        method: "POST",
-        body: JSON.stringify(payload),
-        headers: { "Content-Type": "application/json" }
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Submit failed");
-      setCompletionCode(data.completionCode || null);
+      const fd = new FormData();
+      fd.append(`entry.${RESPONSES_ENTRY_ID}`, JSON.stringify(payload));
+      await fetch(FORM_POST_URL, { method: "POST", body: fd, mode: "no-cors" });
+      setCompletionCode("C-" + Math.random().toString(36).substring(2, 9).toUpperCase());
       setStage("complete");
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
-      console.error("Submit error:", err);
-      alert("Submission failed: " + (err.message || "unknown error"));
+      console.error("Google Form submit error:", err);
+      alert("Submission failed — please try again.");
     }
   }
 
@@ -398,7 +447,7 @@ export default function SurveyPage() {
         {stage === "video" && assignedAd && (
           <div className="card">
             <h2>Please watch the video</h2>
-            <div id="yt-player" style={{ display: "flex", justifyContent: "center" }} />
+            <div id="yt-player" className="yt-player" />
             <p className="muted small">Questions will appear after the video ends. Please watch the full video.</p>
             {/* <div style={{ marginTop: 12 }}>
               <button className="btn ghost" onClick={() => { setClickedMoreInfo(true); window.open(assignedAd.moreInfo, "_blank", "noopener"); }}>Open product information (optional)</button>
@@ -517,6 +566,9 @@ export default function SurveyPage() {
         .progress{height:8px;background:rgba(2,6,23,0.05);border-radius:999px;margin:8px 0 16px;overflow:hidden}
         .progress-inner{height:100%;background:linear-gradient(90deg,var(--primary),var(--accent));width:0%;transition:width .6s ease}
         @media (max-width:720px){.container{padding:0 12px}.card{padding:16px}.choice-large{padding:10px}}
+        /* Responsive YouTube player container */
+        #yt-player.yt-player{width:100%;max-width:720px;margin:12px auto;display:block;aspect-ratio:16/9;position:relative;background:#000;border-radius:8px;overflow:hidden}
+        #yt-player.yt-player iframe{width:100% !important;height:100% !important;position:absolute;left:0;top:0}
       `}</style>
     </div>
   );
@@ -577,3 +629,77 @@ function ProgressBar({ stage = "consent", currentQ = 0, totalQ = 1 }) {
     </div>
   );
 }
+// submitToGoogleForm.js  (paste into your project and import it)
+export async function submitToGoogleForm(formPostUrl, entryMap, payload) {
+  // formPostUrl - string like:
+  // https://docs.google.com/forms/d/e/<FORM_ID>/formResponse
+  // entryMap - object mapping your payload keys -> Google Form entry IDs
+  // payload - object with keys:
+  // { participantId, consent, ageGroup, gender, assignedAdCode,
+  //   assignedAdURL, startTime, endTime, watchSeconds,
+  //   clickedMoreInfo, moreInfoURL, responses (object), timestamp, completionCode }
+
+  // Build FormData matching Google Form entry names
+  const fd = new FormData();
+
+  // convenience helper: set entry by key if present
+  const setIf = (key, value) => {
+    if (typeof value === "boolean") value = value ? "true" : "false";
+    if (value === null || value === undefined) value = "";
+    const entryId = entryMap[key];
+    if (entryId) fd.append(`entry.${entryId}`, String(value));
+  };
+
+  // Basic metadata
+  setIf("participantId", payload.participantId);
+  setIf("consent", payload.consent);
+  setIf("ageGroup", payload.ageGroup);
+  setIf("gender", payload.gender);
+  setIf("assignedAdCode", payload.assignedAdCode);
+  setIf("assignedAdURL", payload.assignedAdURL);
+
+  setIf("startTime", payload.startTime);
+  setIf("endTime", payload.endTime);
+  setIf("watchSeconds", payload.watchSeconds);
+  setIf("clickedMoreInfo", payload.clickedMoreInfo);
+  setIf("moreInfoURL", payload.moreInfoURL);
+  setIf("timestamp", payload.timestamp);
+  setIf("completionCode", payload.completionCode);
+
+  // responses: object with questionText -> { numeric, text }
+  // Google Form cannot accept a JSON directly in 1 field nicely for analysis, so:
+  // Option A — if you created one field per question in the Form, map each question individually.
+  // Option B — append a single large JSON string to a field called `responses_json` (if you created one).
+  // We'll do BOTH: if entryMap has keys for individual questions, it will populate them.
+  if (payload.responses) {
+    // If entryMap has a mapping for 'responses_json' append full JSON
+    if (entryMap["responses_json"]) {
+      fd.append(`entry.${entryMap["responses_json"]}`, JSON.stringify(payload.responses));
+    }
+
+    // try to map per-question fields
+    for (const [qText, resp] of Object.entries(payload.responses)) {
+      // entryMap per question must use a normalized key — e.g. you created form question label "Q1 - <shortname>"
+      // We expect entryMap to include keys like "Q1" or a key you used when creating the form.
+      // If you made entry IDs for each question label, add them into entryMap and the code below will set them.
+      const safeKey = qText; // use exact question text only if you used it as mapping key
+      if (entryMap[safeKey]) {
+        const entryId = entryMap[safeKey];
+        // store numeric and text concatenated to be safe
+        fd.append(`entry.${entryId}`, `${resp.numeric ?? ""} | ${resp.text ?? ""}`);
+      }
+    }
+  }
+
+  // Post - Google Forms expects a simple POST
+  const res = await fetch(formPostUrl, {
+    method: "POST",
+    body: fd,
+    mode: "no-cors" // no-cors avoids CORS errors; note: response will be opaque, so handle success on client side
+  });
+
+  // Because mode:'no-cors' returns opaque response, just consider it successful if no exception thrown.
+  // To be robust, you can also write to localStorage or show a thank-you UI immediately.
+  return { ok: true };
+}
+
