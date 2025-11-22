@@ -150,7 +150,7 @@ export default function SurveyPage() {
       events: {
         onReady: (e) => {
           try {
-            e.target.playVideo();
+            //e.target.playVideo();
             setStartTime(new Date().toISOString());
           } catch {}
         },
