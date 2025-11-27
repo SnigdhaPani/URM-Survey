@@ -432,7 +432,11 @@ export default function SurveyPage() {
               <label className="label">Gender</label>
               <div className="radios">
                 <label className="radio-inline"><input type="radio" name="gen" onChange={() => setGender("Male")} /> Male</label>
-                <label className="radio-inline"><input type="radio" name="gen" onChange={() => setGender("Female")} /> Female</label>
+                <label className="radio-inline"><input type="radio" name="gen" onChange={() => setGender("Female")} /> Female</label>                 
+                  <label className="radio-inline"><input type="radio" name="gen" onChange={() => setGender("Trans-Male")} /> Trans-Male</label>
+                  <label className="radio-inline"><input type="radio" name="gen" onChange={() => setGender("Trans-Female")} /> Trans-Female</label>
+                  <label className="radio-inline"><input type="radio" name="gen" onChange={() => setGender("Non-Binary")} /> Non-Binary</label>
+                  <label className="radio-inline"><input type="radio" name="gen" onChange={() => setGender("Don't know")} /> Don't know</label>
                 <label className="radio-inline"><input type="radio" name="gen" onChange={() => setGender("Other")} /> Other</label>
                 <label className="radio-inline"><input type="radio" name="gen" onChange={() => setGender("Prefer not to say")} /> Prefer not to say</label>
               </div>
